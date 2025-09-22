@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>むぎちゃんのフードガードチャレンジ</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+            overflow: hidden;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: none;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #hand-cursor {
+            position: fixed;
+            width: 60px;
+            height: 60px;
+            pointer-events: none;
+            z-index: 200;
+            transition: transform 0.1s ease;
+            font-size: 40px;
+        }
+
+        #hand-cursor.grabbing {
+            transform: rotate(-20deg);
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px 25px;
+            border-radius: 15px;
+            font-size: 14px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        #info h2 {
+            margin-bottom: 15px;
+            font-size: 22px;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        #info p {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+
+        .objective {
+            background: rgba(255, 215, 0, 0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border-left: 4px solid #ffd700;
+        }
+
+        #score {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 20px 25px;
+            border-radius: 15px;
+            font-size: 16px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        #score p {
+            margin: 8px 0;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        .progress-bar {
+            width: 150px;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+            overflow: hidden;
+            margin-left: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+        }
+
+        .alert-bar .progress-fill {
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #FF5722);
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 100;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            background: rgba(255, 255, 255, 0.95);
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.1);
+            transform: translate(-50%, -50%);
+            transition: width 0.5s, height 0.5s;
+        }
+
+        .btn:hover {
+            background: white;
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:hover:before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-icon {
+            margin-right: 8px;
+        }
+
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            text-align: center;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            z-index: 50;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            pointer-events: none;
+            padding: 20px 40px;
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            backdrop-filter: blur(5px);
+        }
+
+        #message.show {
+            opacity: 1;
+            animation: messagePopup 0.5s ease;
+        }
+
+        @keyframes messagePopup {
+            0% {
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            50% {
+                transform: translate(-50%, -50%) scale(1.1);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        #game-over.show {
+            display: flex;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #game-over h1 {
+            color: #ff5555;
+            font-size: 48px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        #game-over p {
+            color: white;
+            font-size: 24px;
+        }
+
+        #game-over button {
+            padding: 20px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        #game-over button:hover {
+            transform: scale(1.1);
+        }
+
+        #success {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 200, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        #success.show {
+            display: flex;
+            animation: fadeIn 0.5s ease;
+        }
+
+        #success h1 {
+            color: white;
+            font-size: 48px;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+        }
+
+        #success p {
+            color: white;
+            font-size: 24px;
+        }
+
+        #success button {
+            padding: 20px 40px;
+            font-size: 20px;
+            background: white;
+            color: #4CAF50;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        #success button:hover {
+            transform: scale(1.1);
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 24px;
+            z-index: 1000;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .trust-indicator {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 24px;
+        }
+
+        #timer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 120px;
+            color: white;
+            text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+            opacity: 0;
+            pointer-events: none;
+            z-index: 150;
+        }
+
+        #timer.show {
+            animation: countdown 1s ease;
+        }
+
+        @keyframes countdown {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            50% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1.2);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div class="loading-spinner"></div>
+        <span>ゲームを準備中...</span>
+    </div>
+    
+    <div id="hand-cursor">✋</div>
+    <div id="timer"></div>
+    
+    <div id="game-container">
+        <div id="info">
+            <h2>🐕 むぎちゃんのフードガードチャレンジ</h2>
+            <div class="objective">
+                <p><strong>ミッション:</strong></p>
+                <p>空のお皿を下げてください！</p>
+                <p>でも、むぎちゃんは守っています...</p>
+                <p>噛まれないように気をつけて！</p>
+            </div>
+        </div>
+        <div id="score">
+            <p>🎯 成功回数: <span id="success-count">0</span></p>
+            <div class="status-bar">
+                <span>信頼度</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="trust-bar" style="width: 0%"></div>
+                </div>
+                <span class="trust-indicator" id="trust-emoji">😰</span>
+            </div>
+            <div class="status-bar alert-bar">
+                <span>警戒度</span>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="alert-bar" style="width: 50%"></div>
+                </div>
+            </div>
+            <p style="margin-top: 10px;">⏱️ タイム: <span id="game-time">00:00</span></p>
+        </div>
+        <div id="message"></div>
+        <div id="controls">
+            <button class="btn" id="pet-btn">
+                <span class="btn-icon">🤚</span>なでる
+            </button>
+            <button class="btn" id="sit-btn">
+                <span class="btn-icon">🪑</span>おすわり
+            </button>
+            <button class="btn" id="down-btn">
+                <span class="btn-icon">🛌</span>ふせ
+            </button>
+            <button class="btn" id="treat-btn">
+                <span class="btn-icon">🍖</span>おやつ
+            </button>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h1>😱 ガブッ！噛まれました！</h1>
+        <p id="game-over-message">むぎちゃんに噛まれてしまいました...</p>
+        <p>成功回数: <span id="final-success">0</span>回</p>
+        <button onclick="restartGame()">もう一度挑戦</button>
+    </div>
+
+    <div id="success">
+        <h1>🎉 成功！</h1>
+        <p>お皿を下げることができました！</p>
+        <p id="success-time">タイム: 00:00</p>
+        <button onclick="continueGame()">次のお皿に挑戦</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script>
+        class MugiChallengeGame {
+            constructor() {
+                // ゲーム状態
+                this.gameState = {
+                    alertLevel: 50,     // 0-100
+                    trustLevel: 0,      // 0-100
+                    isGuarding: true,
+                    successCount: 0,
+                    gameTime: 0,
+                    isGameOver: false,
+                    canInteract: true,
+                    isDogSitting: false,
+                    isDogDown: false,
+                    handNearBowl: false,
+                    bowlTaken: false
+                };
+
+                // Three.js関連
+                this.scene = null;
+                this.camera = null;
+                this.renderer = null;
+                this.raycaster = new THREE.Raycaster();
+                this.mousePosition = new THREE.Vector2();
+                this.handPosition = new THREE.Vector3();
+
+                // 3Dオブジェクト
+                this.dogModel = null;
+                this.foodBowl = null;
+                this.room = null;
+                this.handModel = null;
+
+                // タイマー
+                this.startTime = Date.now();
+                this.timerInterval = null;
+
+                this.init();
+            }
+
+            init() {
+                this.setupScene();
+                this.setupLights();
+                this.createRoom();
+                this.createDog();
+                this.createFoodBowl();
+                this.createHand();
+                this.setupEventListeners();
+                this.hideLoading();
+                this.startGameTimer();
+                this.animate();
+                
+                this.showMessage('むぎちゃんが空のお皿を守っています！', 3000);
+            }
+
+            setupScene() {
+                // シーン
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0xf0f0f0, 0.001);
+
+                // カメラ
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+                this.camera.position.set(6, 8, 12);
+                this.camera.lookAt(0, 0, 0);
+
+                // レンダラー
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                this.renderer.setClearColor(0xf0f0f0);
+
+                const container = document.getElementById('game-container');
+                container.appendChild(this.renderer.domElement);
+            }
+
+            setupLights() {
+                // アンビエントライト
+                const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+                this.scene.add(ambientLight);
+
+                // ディレクショナルライト
+                const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+                directionalLight.position.set(10, 20, 10);
+                directionalLight.castShadow = true;
+                directionalLight.shadow.camera.left = -15;
+                directionalLight.shadow.camera.right = 15;
+                directionalLight.shadow.camera.top = 15;
+                directionalLight.shadow.camera.bottom = -15;
+                directionalLight.shadow.mapSize.width = 2048;
+                directionalLight.shadow.mapSize.height = 2048;
+                this.scene.add(directionalLight);
+
+                // ポイントライト
+                const pointLight = new THREE.PointLight(0xffcc88, 0.4, 20);
+                pointLight.position.set(0, 8, 0);
+                this.scene.add(pointLight);
+            }
+
+            createRoom() {
+                // 床
+                const floorGeometry = new THREE.PlaneGeometry(25, 25);
+                const floorTexture = this.createWoodTexture();
+                const floorMaterial = new THREE.MeshStandardMaterial({
+                    map: floorTexture,
+                    roughness: 0.8
+                });
+                const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+                floor.rotation.x = -Math.PI / 2;
+                floor.receiveShadow = true;
+                this.scene.add(floor);
+
+                // 壁
+                const wallMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xf5e6d3,
+                    roughness: 0.9
+                });
+
+                // 後ろの壁
+                const backWall = new THREE.Mesh(
+                    new THREE.PlaneGeometry(25, 12),
+                    wallMaterial
+                );
+                backWall.position.set(0, 6, -12.5);
+                backWall.receiveShadow = true;
+                this.scene.add(backWall);
+
+                // 左の壁
+                const leftWall = new THREE.Mesh(
+                    new THREE.PlaneGeometry(25, 12),
+                    wallMaterial
+                );
+                leftWall.position.set(-12.5, 6, 0);
+                leftWall.rotation.y = Math.PI / 2;
+                leftWall.receiveShadow = true;
+                this.scene.add(leftWall);
+            }
+
+            createWoodTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+
+                ctx.fillStyle = '#d4a373';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                ctx.strokeStyle = '#b08968';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < canvas.height; i += 10) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, i + Math.sin(i * 0.01) * 5);
+                    ctx.lineTo(canvas.width, i + Math.sin(i * 0.01) * 5);
+                    ctx.stroke();
+                }
+
+                const texture = new THREE.CanvasTexture(canvas);
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(4, 4);
+                return texture;
+            }
+
+            createDog() {
+                const dogGroup = new THREE.Group();
+
+                // 体
+                const bodyGeometry = new THREE.BoxGeometry(3.5, 2.5, 5);
+                const bodyMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xd4a373,
+                    roughness: 0.8
+                });
+                const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+                body.position.y = 1.5;
+                body.castShadow = true;
+                dogGroup.add(body);
+
+                // 頭
+                const headGeometry = new THREE.BoxGeometry(2.5, 2.5, 3);
+                const head = new THREE.Mesh(headGeometry, bodyMaterial);
+                head.position.set(0, 2.8, 2);
+                head.castShadow = true;
+                dogGroup.add(head);
+
+                // 耳
+                const earGeometry = new THREE.ConeGeometry(0.6, 1.2, 4);
+                const leftEar = new THREE.Mesh(earGeometry, bodyMaterial);
+                leftEar.position.set(-0.7, 4, 2);
+                leftEar.rotation.z = -0.3;
+                dogGroup.add(leftEar);
+
+                const rightEar = new THREE.Mesh(earGeometry, bodyMaterial);
+                rightEar.position.set(0.7, 4, 2);
+                rightEar.rotation.z = 0.3;
+                dogGroup.add(rightEar);
+
+                // 鼻
+                const noseGeometry = new THREE.SphereGeometry(0.2);
+                const noseMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x000000,
+                    roughness: 0.3
+                });
+                const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+                nose.position.set(0, 2.5, 3.3);
+                dogGroup.add(nose);
+
+                // 目
+                const eyeGeometry = new THREE.SphereGeometry(0.25);
+                const eyeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x000000
+                });
+
+                const leftEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                leftEye.position.set(-0.6, 3.2, 2.8);
+                dogGroup.add(leftEye);
+
+                const rightEye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+                rightEye.position.set(0.6, 3.2, 2.8);
+                dogGroup.add(rightEye);
+
+                // 足
+                const legGeometry = new THREE.CylinderGeometry(0.4, 0.4, 1.8);
+                const positions = [
+                    [-1, 0.9, 1.5],
+                    [1, 0.9, 1.5],
+                    [-1, 0.9, -1.5],
+                    [1, 0.9, -1.5]
+                ];
+
+                positions.forEach(pos => {
+                    const leg = new THREE.Mesh(legGeometry, bodyMaterial);
+                    leg.position.set(...pos);
+                    leg.castShadow = true;
+                    dogGroup.add(leg);
+                });
+
+                // しっぽ
+                const tailGeometry = new THREE.CylinderGeometry(0.4, 0.15, 2.5);
+                const tail = new THREE.Mesh(tailGeometry, bodyMaterial);
+                tail.position.set(0, 3, -2.5);
+                tail.rotation.z = Math.PI / 4;
+                tail.castShadow = true;
+                dogGroup.add(tail);
+
+                dogGroup.position.set(0, 0, -3);
+                this.scene.add(dogGroup);
+                this.dogModel = dogGroup;
+            }
+
+            createFoodBowl() {
+                const bowlGroup = new THREE.Group();
+
+                // 皿の外側
+                const bowlGeometry = new THREE.CylinderGeometry(1.5, 1.2, 0.6, 16);
+                const bowlMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4169e1,
+                    roughness: 0.3,
+                    metalness: 0.5
+                });
+                const bowl = new THREE.Mesh(bowlGeometry, bowlMaterial);
+                bowl.castShadow = true;
+                bowl.receiveShadow = true;
+                bowlGroup.add(bowl);
+
+                // 内側
+                const innerBowlGeometry = new THREE.CylinderGeometry(1.3, 1, 0.5, 16);
+                const innerBowlMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x314fa0,
+                    roughness: 0.3,
+                    metalness: 0.5
+                });
+                const innerBowl = new THREE.Mesh(innerBowlGeometry, innerBowlMaterial);
+                innerBowl.position.y = 0.05;
+                bowlGroup.add(innerBowl);
+
+                bowlGroup.position.set(0, 0.3, 2);
+                this.scene.add(bowlGroup);
+                this.foodBowl = bowlGroup;
+            }
+
+            createHand() {
+                // 3D空間での手（見えない）
+                const handGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const handMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffcc99,
+                    transparent: true,
+                    opacity: 0
+                });
+                this.handModel = new THREE.Mesh(handGeometry, handMaterial);
+                this.scene.add(this.handModel);
+            }
+
+            setupEventListeners() {
+                // マウス移動
+                window.addEventListener('mousemove', (e) => {
+                    this.handleMouseMove(e);
+                });
+
+                // マウスクリック
+                window.addEventListener('click', (e) => {
+                    this.handleClick(e);
+                });
+
+                // ウィンドウリサイズ
+                window.addEventListener('resize', () => {
+                    this.handleResize();
+                });
+
+                // ボタンイベント
+                document.getElementById('pet-btn').addEventListener('click', () => {
+                    this.petDog();
+                });
+
+                document.getElementById('sit-btn').addEventListener('click', () => {
+                    this.commandSit();
+                });
+
+                document.getElementById('down-btn').addEventListener('click', () => {
+                    this.commandDown();
+                });
+
+                document.getElementById('treat-btn').addEventListener('click', () => {
+                    this.giveTreat();
+                });
+            }
+
+            handleMouseMove(event) {
+                // カーソル位置更新
+                const cursor = document.getElementById('hand-cursor');
+                cursor.style.left = (event.clientX - 30) + 'px';
+                cursor.style.top = (event.clientY - 30) + 'px';
+
+                // Three.js座標
+                this.mousePosition.x = (event.clientX / window.innerWidth) * 2 - 1;
+                this.mousePosition.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+                // レイキャスト
+                this.raycaster.setFromCamera(this.mousePosition, this.camera);
+
+                // 手の位置を3D空間に配置
+                const planeZ = new THREE.Plane(new THREE.Vector3(0, 0, 1), -2);
+                const intersection = new THREE.Vector3();
+                this.raycaster.ray.intersectPlane(planeZ, intersection);
+                
+                if (this.handModel && intersection) {
+                    this.handModel.position.copy(intersection);
+                    this.handModel.position.z = 3;
+                }
+
+                // お皿との距離チェック
+                this.checkBowlProximity();
+            }
+
+            handleClick(event) {
+                if (this.gameState.isGameOver || !this.gameState.canInteract) return;
+
+                // お皿をクリックしたかチェック
+                this.raycaster.setFromCamera(this.mousePosition, this.camera);
+                const intersects = this.raycaster.intersectObject(this.foodBowl, true);
+
+                if (intersects.length > 0) {
+                    this.tryToTakeBowl();
+                }
+            }
+
+            checkBowlProximity() {
+                if (!this.handModel || !this.foodBowl) return;
+
+                const distance = this.handModel.position.distanceTo(this.foodBowl.position);
+                this.gameState.handNearBowl = distance < 3;
+
+                if (this.gameState.handNearBowl && this.gameState.isGuarding) {
+                    // 警戒レベル上昇
+                    if (this.gameState.alertLevel < 100) {
+                        this.gameState.alertLevel = Math.min(100, this.gameState.alertLevel + 0.5);
+                        this.updateAlertBar();
+                        
+                        // 犬の反応
+                        if (this.gameState.alertLevel > 80) {
+                            this.dogGrowl();
+                        }
+                    }
+                } else {
+                    // 警戒レベル低下
+                    if (this.gameState.alertLevel > 30) {
+                        this.gameState.alertLevel = Math.max(30, this.gameState.alertLevel - 0.2);
+                        this.updateAlertBar();
+                    }
+                }
+            }
+
+            tryToTakeBowl() {
+                const cursor = document.getElementById('hand-cursor');
+                cursor.classList.add('grabbing');
+                
+                setTimeout(() => {
+                    cursor.classList.remove('grabbing');
+                }, 300);
+
+                // 成功判定
+                const successChance = this.calculateSuccessChance();
+                const random = Math.random() * 100;
+
+                if (random < successChance) {
+                    // 成功！
+                    this.successTakeBowl();
+                } else {
+                    // 失敗...噛まれる！
+                    this.getBitten();
+                }
+            }
+
+            calculateSuccessChance() {
+                let chance = 50; // 基本成功率
+
+                // 警戒レベルによる減少
+                chance -= this.gameState.alertLevel * 0.5;
+
+                // 信頼度による増加
+                chance += this.gameState.trustLevel * 0.3;
+
+                // おすわり中
+                if (this.gameState.isDogSitting) {
+                    chance += 20;
+                }
+
+                // ふせ中
+                if (this.gameState.isDogDown) {
+                    chance += 30;
+                }
+
+                return Math.max(5, Math.min(95, chance));
+            }
+
+            successTakeBowl() {
+                this.gameState.bowlTaken = true;
+                this.gameState.successCount++;
+                this.gameState.isGuarding = false;
+
+                // お皿を移動
+                new TWEEN.Tween(this.foodBowl.position)
+                    .to({ y: 5, z: 10 }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+
+                // 成功画面表示
+                this.showSuccessScreen();
+                this.updateScore();
+            }
+
+            getBitten() {
+                this.gameState.isGameOver = true;
+                
+                // 犬が噛むアニメーション
+                this.dogBiteAnimation();
+                
+                // ゲームオーバー画面
+                setTimeout(() => {
+                    this.showGameOverScreen();
+                }, 500);
+            }
+
+            petDog() {
+                if (!this.gameState.canInteract) return;
+
+                this.gameState.canInteract = false;
+                
+                // 信頼度上昇
+                this.gameState.trustLevel = Math.min(100, this.gameState.trustLevel + 15);
+                this.updateTrustBar();
+
+                // 警戒レベル低下
+                this.gameState.alertLevel = Math.max(20, this.gameState.alertLevel - 10);
+                this.updateAlertBar();
+
+                // 犬の反応
+                this.dogHappyAnimation();
+                this.showMessage('むぎ: 「きもちいい〜♪」', 2000);
+
+                setTimeout(() => {
+                    this.gameState.canInteract = true;
+                }, 2000);
+            }
+
+            commandSit() {
+                if (!this.gameState.canInteract) return;
+
+                this.gameState.canInteract = false;
+                
+                // 成功率
+                const success = Math.random() > 0.3 - (this.gameState.trustLevel * 0.003);
+                
+                if (success) {
+                    this.gameState.isDogSitting = true;
+                    this.gameState.isDogDown = false;
+                    this.dogSitAnimation();
+                    this.showMessage('むぎ: 「おすわり！」', 2000);
+                    
+                    // 信頼度微増
+                    this.gameState.trustLevel = Math.min(100, this.gameState.trustLevel + 5);
+                    this.updateTrustBar();
+                    
+                    // 3秒後に解除
+                    setTimeout(() => {
+                        this.gameState.isDogSitting = false;
+                        this.dogStandAnimation();
+                    }, 3000);
+                } else {
+                    this.showMessage('むぎ: 「...？」（無視された）', 2000);
+                }
+
+                setTimeout(() => {
+                    this.gameState.canInteract = true;
+                }, 1500);
+            }
+
+            commandDown() {
+                if (!this.gameState.canInteract) return;
+
+                this.gameState.canInteract = false;
+                
+                // 成功率（信頼度が高いほど成功しやすい）
+                const success = Math.random() > 0.5 - (this.gameState.trustLevel * 0.004);
+                
+                if (success) {
+                    this.gameState.isDogDown = true;
+                    this.gameState.isDogSitting = false;
+                    this.dogDownAnimation();
+                    this.showMessage('むぎ: 「ふせ〜」', 2000);
+                    
+                    // 信頼度増加
+                    this.gameState.trustLevel = Math.min(100, this.gameState.trustLevel + 10);
+                    this.updateTrustBar();
+                    
+                    // 警戒度も大きく下がる
+                    this.gameState.alertLevel = Math.max(10, this.gameState.alertLevel - 20);
+                    this.updateAlertBar();
+                    
+                    // 4秒後に解除
+                    setTimeout(() => {
+                        this.gameState.isDogDown = false;
+                        this.dogStandAnimation();
+                    }, 4000);
+                } else {
+                    this.showMessage('むぎ: 「やだ！」', 2000);
+                }
+
+                setTimeout(() => {
+                    this.gameState.canInteract = true;
+                }, 1500);
+            }
+
+            giveTreat() {
+                if (!this.gameState.canInteract) return;
+
+                this.gameState.canInteract = false;
+                
+                // 信頼度大幅上昇
+                this.gameState.trustLevel = Math.min(100, this.gameState.trustLevel + 25);
+                this.updateTrustBar();
+                
+                // 警戒レベル低下
+                this.gameState.alertLevel = Math.max(15, this.gameState.alertLevel - 15);
+                this.updateAlertBar();
+                
+                // おやつ取りに行くアニメーション
+                this.dogGetTreatAnimation();
+                this.showMessage('むぎ: 「おやつだ！！」', 2500);
+                
+                // しばらく無防備になる
+                this.gameState.isGuarding = false;
+                setTimeout(() => {
+                    this.gameState.isGuarding = true;
+                }, 2500);
+
+                setTimeout(() => {
+                    this.gameState.canInteract = true;
+                }, 3000);
+            }
+
+            // アニメーション系
+            dogGrowl() {
+                if (!this.dogModel) return;
+                
+                // 震えるアニメーション
+                const originalX = this.dogModel.position.x;
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ x: originalX + 0.05 }, 50)
+                    .repeat(4)
+                    .yoyo(true)
+                    .start();
+            }
+
+            dogBiteAnimation() {
+                if (!this.dogModel) return;
+                
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ z: 2 }, 200)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .chain(
+                        new TWEEN.Tween(this.dogModel.position)
+                            .to({ z: -3 }, 300)
+                            .easing(TWEEN.Easing.Quadratic.In)
+                    )
+                    .start();
+                
+                this.showMessage('ガブッ！！', 1000);
+            }
+
+            dogHappyAnimation() {
+                if (!this.dogModel) return;
+                
+                // しっぽを振る
+                const tail = this.dogModel.children[this.dogModel.children.length - 1];
+                new TWEEN.Tween(tail.rotation)
+                    .to({ x: Math.PI / 3 }, 200)
+                    .repeat(6)
+                    .yoyo(true)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .start();
+            }
+
+            dogSitAnimation() {
+                if (!this.dogModel) return;
+                
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ y: -0.5 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            dogDownAnimation() {
+                if (!this.dogModel) return;
+                
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ y: -1 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+                
+                new TWEEN.Tween(this.dogModel.rotation)
+                    .to({ x: -Math.PI / 12 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            dogStandAnimation() {
+                if (!this.dogModel) return;
+                
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ y: 0 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+                
+                new TWEEN.Tween(this.dogModel.rotation)
+                    .to({ x: 0 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+            }
+
+            dogGetTreatAnimation() {
+                if (!this.dogModel) return;
+                
+                // ジャンプ
+                new TWEEN.Tween(this.dogModel.position)
+                    .to({ y: 2 }, 300)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .chain(
+                        new TWEEN.Tween(this.dogModel.position)
+                            .to({ y: 0 }, 300)
+                            .easing(TWEEN.Easing.Quadratic.In)
+                    )
+                    .start();
+                
+                // 回転
+                new TWEEN.Tween(this.dogModel.rotation)
+                    .to({ y: Math.PI * 2 }, 600)
+                    .easing(TWEEN.Easing.Quadratic.InOut)
+                    .start();
+            }
+
+            // UI更新
+            updateAlertBar() {
+                const bar = document.getElementById('alert-bar');
+                bar.style.width = this.gameState.alertLevel + '%';
+            }
+
+            updateTrustBar() {
+                const bar = document.getElementById('trust-bar');
+                bar.style.width = this.gameState.trustLevel + '%';
+                
+                const emoji = document.getElementById('trust-emoji');
+                if (this.gameState.trustLevel < 20) {
+                    emoji.textContent = '😰';
+                } else if (this.gameState.trustLevel < 40) {
+                    emoji.textContent = '😟';
+                } else if (this.gameState.trustLevel < 60) {
+                    emoji.textContent = '😐';
+                } else if (this.gameState.trustLevel < 80) {
+                    emoji.textContent = '🙂';
+                } else {
+                    emoji.textContent = '😊';
+                }
+            }
+
+            updateScore() {
+                document.getElementById('success-count').textContent = this.gameState.successCount;
+            }
+
+            startGameTimer() {
+                this.timerInterval = setInterval(() => {
+                    if (!this.gameState.isGameOver) {
+                        this.gameState.gameTime++;
+                        const minutes = Math.floor(this.gameState.gameTime / 60);
+                        const seconds = this.gameState.gameTime % 60;
+                        const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                        document.getElementById('game-time').textContent = timeStr;
+                    }
+                }, 1000);
+            }
+
+            showMessage(text, duration) {
+                const messageEl = document.getElementById('message');
+                messageEl.textContent = text;
+                messageEl.classList.add('show');
+                
+                setTimeout(() => {
+                    messageEl.classList.remove('show');
+                }, duration);
+            }
+
+            showGameOverScreen() {
+                clearInterval(this.timerInterval);
+                document.getElementById('final-success').textContent = this.gameState.successCount;
+                document.getElementById('game-over').classList.add('show');
+            }
+
+            showSuccessScreen() {
+                const minutes = Math.floor(this.gameState.gameTime / 60);
+                const seconds = this.gameState.gameTime % 60;
+                const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                document.getElementById('success-time').textContent = `タイム: ${timeStr}`;
+                document.getElementById('success').classList.add('show');
+            }
+
+            hideLoading() {
+                const loadingEl = document.getElementById('loading');
+                loadingEl.style.opacity = '0';
+                setTimeout(() => {
+                    loadingEl.style.display = 'none';
+                }, 500);
+            }
+
+            handleResize() {
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera.aspect = aspect;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Tweenアニメーション更新
+                TWEEN.update();
+                
+                // カメラの微細な動き
+                const time = Date.now() * 0.001;
+                this.camera.position.x = Math.sin(time * 0.1) * 0.3 + 6;
+                this.camera.position.y = Math.cos(time * 0.08) * 0.2 + 8;
+                this.camera.lookAt(0, 1, 0);
+                
+                // 犬のアイドルアニメーション
+                if (this.dogModel && !this.gameState.isDogSitting && !this.gameState.isDogDown) {
+                    // 呼吸
+                    const body = this.dogModel.children[0];
+                    if (body) {
+                        body.scale.y = 1 + Math.sin(time * 2) * 0.02;
+                    }
+                    
+                    // しっぽの動き（警戒度に応じて）
+                    const tail = this.dogModel.children[this.dogModel.children.length - 1];
+                    if (tail) {
+                        const speed = 2 + this.gameState.alertLevel * 0.05;
+                        tail.rotation.x = Math.sin(time * speed) * 0.1;
+                    }
+                }
+                
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+
+        // ゲームコントロール関数
+        function restartGame() {
+            location.reload();
+        }
+
+        function continueGame() {
+            const game = window.gameInstance;
+            if (!game) return;
+            
+            // 成功画面を隠す
+            document.getElementById('success').classList.remove('show');
+            
+            // 新しいお皿を配置
+            setTimeout(() => {
+                // お皿を元の位置に戻す
+                new TWEEN.Tween(game.foodBowl.position)
+                    .to({ y: 0.3, z: 2 }, 1000)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .start();
+                
+                // 状態リセット
+                game.gameState.isGuarding = true;
+                game.gameState.bowlTaken = false;
+                game.gameState.alertLevel = 50 + game.gameState.successCount * 10; // 難易度上昇
+                game.gameState.trustLevel = Math.max(0, game.gameState.trustLevel - 20);
+                game.updateAlertBar();
+                game.updateTrustBar();
+                
+                // カウントダウン表示
+                const timer = document.getElementById('timer');
+                let count = 3;
+                
+                const countdown = setInterval(() => {
+                    timer.textContent = count;
+                    timer.classList.add('show');
+                    
+                    setTimeout(() => {
+                        timer.classList.remove('show');
+                    }, 900);
+                    
+                    count--;
+                    if (count < 0) {
+                        clearInterval(countdown);
+                        game.showMessage('次のラウンド開始！', 2000);
+                    }
+                }, 1000);
+            }, 500);
+        }
+
+        // ゲーム開始
+        window.addEventListener('DOMContentLoaded', () => {
+            window.gameInstance = new MugiChallengeGame();
+        });
+    </script>
+</body>
+</html>
